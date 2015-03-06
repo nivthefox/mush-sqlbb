@@ -1,0 +1,245 @@
+@@ Copyright (C) 2015 Kevin Kragenbrink <kevin@writh.net>
+@@
+@@ Permission is hereby granted, free of charge, to any person obtaining a copy
+@@ of this software and associated documentation files (the "Software"), to
+@@ deal in the Software without restriction, including without limitation the
+@@ rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+@@ sell copies of the Software, and to permit persons to whom the Software is
+@@ furnished to do so, subject to the following conditions:
+@@
+@@ The above copyright notice and this permission notice shall be included in
+@@ all copies or substantial portions of the Software.
+@@
+@@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+@@ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+@@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+@@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+@@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+@@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+@@ IN THE SOFTWARE.
+
+@create [System] Loki's Bulletin Boards
+
+@@ //////////////////////////
+@@ Configuration
+@@ //////////////////////////
+&CONFIG`BBMESSAGE [System] Loki's Bulletin Boards=ansi( hw, +bb ) %0
+-
+&CONFIG`FOOTER [System] Loki's Bulletin Boards=tail( %0 )
+-
+&CONFIG`HEADER [System] Loki's Bulletin Boards=header( %0 )
+-
+&CONFIG`LBUF [System] Loki's Bulletin Boards=3700
+-
+&CONFIG`PREFIX [System] Loki's Bulletin Boards=loki_
+-
+&CONFIG`SEPARATOR [System] Loki's Bulletin Boards=separator( %0 )
+-
+&CONFIG`WARNING [System] Loki's Bulletin Boards=ansi( hr, WARNING: ) %0
+-
+&CONFIG`MESSAGE [System] Loki's Bulletin Boards=ansi( hw, +bb ) %0
+-
+&CONFIG`BBMOD [System] Loki's Bulletin Boards=1
+-
+
+@@ //////////////////////////
+@@ Commands
+@@ //////////////////////////
+&COMMAND`+BB [System] Loki's Bulletin Boards=$+bb *:@assert hasattr( %!, DATA`POST_HEADER_%# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not writing a message. ); }; @assert lte( setr( L, add( strlen( xget( %!, DATA`POST_BODY_%# ) ), strlen( objeval( %#, %0 ) ) ) ), v( CONFIG`LBUF ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, The total text length would be %qL \(max 3500\). Consider breaking your text into multiple posts. ); }; &DATA`POST_BODY_%# %! = [xget( %!, DATA`POST_BODY_%# )] [objeval( %#, %0 )]; @pemit %# = ulocal( %!/CONFIG`MESSAGE, Text added to your bbpost. \(%qL/[v( CONFIG`LBUF )]\) );
+-
+&COMMAND`+BBCATCHUP [System] Loki's Bulletin Boards=$+bbcatchup *:think setq( T, switch( 1, strmatch( ALL, trim( ucstr( %0 ) ) ), A, eq( words( %0 ), words( filter( %!/FILTER`IS_INT, %0 ) ) ), #, N ) ); think setq( L, switch( %qT, A, filter( %!/FILTER`BOARD_READER, sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ) ), , , %#, ), #, filter( %!/FILTER`BOARD_READER, iter( trim( %0 ), ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, itext( 0 ) ) ), , , %#, ), filter( %!/FILTER`BOARD_READER, ulocal( %!/FUNCTION`GET_BOARD_BY_NAME, trim( %0 ) ), , , %#, ) ) ); @assert words( filter( %!/FILTER`IS_INT, %qL ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid list of boards to mark. ); }; think iter( sql( ulocal( %!/QUERY`SELECT`UNREAD_BY_READER_AND_BOARDS, %#, edit( %qL, %b, %, ) ) ), ulocal( %!/FUNCTION`MARK_READ, %#, itext( 0 ) ) ); @pemit %# = switch( %qT, A, ulocal( %!/CONFIG`MESSAGE, All postings on all boards marked as read. ), iter( %qL, ulocal( %!/CONFIG`MESSAGE, All postings on board #[ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD, itext( 0 ) )] \([sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, itext( 0 ), name ) )]\) marked as read. ), , %r ) );
+-
+&COMMAND`+BBCLEARGROUP [System] Loki's Bulletin Boards=$+bbcleargroup *:@assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBWIZ, %# ), match( %#, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, owner ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not own that board. ); }; think setq( N, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) ); @pemit %# = ulocal( %!/CONFIG`WARNING, { You are about to delete the %qN board and all of its messages. This operation cannot be undone. If you wish to proceed, type '[ansi( hw, +bbconfirm [trim( %0 )] )]' } ); &_BBCLEAR.%qB %# = %0; @wait 60 = { &_BBCLEAR.%qB %#; };
+-
+&COMMAND`+BBCONFIG [System] Loki's Bulletin Boards=$+bbconfig */*=*:@assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBWIZ, %# ), match( %#, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, owner ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not own that board. ); }; @assert hasattr( %!, FUNCTION`CONFIG`%1 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such config option. ); }; @pemit %# = ulocal( %!/CONFIG`MESSAGE, ulocal( %!/FUNCTION`CONFIG`%1, %qB, %2 ) );
+-
+&COMMAND`+BBCONFIRM [System] Loki's Bulletin Boards=$+bbconfirm *:@assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by integer. ); }; think setq( G, ulocal( %!/FUNCTION`MATCH_CLEAR_GROUP, %#, %0 ) ); @assert eq( words( %qG ), 1 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not in the process of clearing that board. ); }; think setq( B, after( %qG, . ) );think sql( ulocal( %!/QUERY`DELETE`ALL_READS_BY_BOARD, %qB ) ); think sql( ulocal( %!/QUERY`DELETE`ALL_MESSAGES_BY_BOARD, %qB ) ); think sql( ulocal( %!/QUERY`DELETE`BOARD_BY_ID, %qB ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You delete board and all of its messages. ); &%qG %#;
+-
+&COMMAND`+BBEDIT [System] Loki's Bulletin Boards=$+bbedit *=*/*:@break strmatch( %0, */* ); @assert hasattr( %!, DATA`POST_HEADER_%# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not writing a message. ); }; @assert match( TEXT TITLE, trim( %0 ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You can only edit the TEXT or the TITLE. ); }; &DATA`POST_[switch( trim( %0 ), TEXT, BODY, TITLE, HEADER )]_%# %! = [switch( trim( %0 ), TITLE, [first( xget( %!, DATA`POST_HEADER_%# ), | )]|[edit( rest( xget( %!, DATA`POST_HEADER_%# ), | ), trim( %1 ), trim( %2 ) )], [edit( xget( %!, DATA`POST_BODY_%# ), trim( %1 ), objeval( %#, trim( %2 ) ) )] )]; think setq( B, first( xget( %!, DATA`POST_HEADER_%# ), | ) ); @pemit %# = ulocal( %!/CONFIG`HEADER, BB Post in Progress ); @pemit %# = Group: [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )]; @pemit %# = Title: [rest( xget( %!, DATA`POST_HEADER_%# ), | )]; @pemit %# = [u( %!/CONFIG`SEPARATOR )]; @pemit %# = [xget( %!, DATA`POST_BODY_%# )]; @pemit %# = [ulocal( %!/CONFIG`FOOTER )];
+-
+&COMMAND`+BBEDIT_POST [System] Loki's Bulletin Boards=$+bbedit */*=*/*:think setq( B, trim( %0 ) ); think setq( M, trim( %1 ) ); @break match( %qM, u ); @assert isint( %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by number. ); }; @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the message by number. ); }; think setq( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qB ) ); @assert ulocal( %!/FUNCTION`CAN_READ, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not have access to that bboard. ); }; think setq( M, ulocal( %!/FUNCTION`GET_MESSAGE_BY_BOARD_AND_NUMBER, %qB, %qM ) ); @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid message number. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBWIZ, %# ), match( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, poster ) ), %# ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not the original poster\; you cannot edit a message you did not write. ); }; think setq( C, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, body ) ) ); think setq( N, edit( %qC, trim( %2 ), objeval( %#, trim( %3 ) ) ) ); think sql( ulocal( %!/QUERY`UPDATE`MESSAGE_BY_ID, %qM, `body` = "%qN" ) ); @pemit %# = ulocal( %!/CONFIG`HEADER, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) ); @pemit %# = [ljust( Message: [edit( %0, %b, )]/[edit( %1, %b, )], 46 )] [ljust( Posted, 10 )] [ljust( Author, 20 )]; @pemit %# = [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, subject ) ), 46 ), 46 )] [ljust( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, created_at ) ) ), 10 )] [ljust( left( ulocal( %!/FUNCTION`GET_AUTHOR, %qM ), 20 ), 20 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @pemit %# = sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, body ) ); @pemit %# = ulocal( %!/CONFIG`FOOTER );
+-
+&COMMAND`+BBJOIN [System] Loki's Bulletin Boards=$+bbjoin *:@assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @assert ulocal( %!/FUNCTION`CAN_READ, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not authorized to read that board. ); }; think sql( ulocal( %!/QUERY`DELETE`BOARD_MEMBER_BY_ID_AND_BOARD, %#, %qB ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You have joined the [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )] board. );
+-
+&COMMAND`+BBLEAVE [System] Loki's Bulletin Boards=$+bbleave *:@assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @asser ulocal( %!/FUNCTION`IS_BOARD_MEMBER, %#, %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not presently a member of that board. ); }; think sql( ulocal( %!/QUERY`INSERT`BOARD_MEMBER, %#, %qB ) ); think sql( ulocal( %!/QUERY`DELETE`BOARD_NOTIFY, %qB, %# ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You have removed yourself from the [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )] board. );
+-
+&COMMAND`+BBLIST [System] Loki's Bulletin Boards=$+bblist:think setq( L, sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ), | ) ); @pemit %# = ulocal( %!/CONFIG`HEADER, Global Bulletin Board ); @pemit %# = [ljust( Available Bulletin Board Groups, 44 )] [center( Member?, 15 )] [center( Timeout \(in days\), 17 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @dolist/delim | %qL|#-1 = { @break match( ##, #-1 ) = { @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @pemit %# = To join groups, type '[ansi( hw, +bbjoin <group number or name> )]'.; @pemit %# = To leave groups, type '[ansi( hw, +bbleave <group number or name> )]'.; @pemit %# = ulocal( %!/CONFIG`FOOTER ); }; @assert ulocal( %!/FUNCTION`CAN_READ, ##, %# ); @pemit %# = [rjust( #@, 4 )]. [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, ##, name ) ), 38 ), 38 )] [center( ifelse( ulocal( %!/FUNCTION`IS_BOARD_MEMBER, %#, ## ), Yes, No ), 15 )] [center( switch( div( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, ##, default_timeout ) ), mul( 60, 60, 24 ) ), 0, None, #$ ), 17 )]; };
+-
+&COMMAND`+BBLOCK [System] Loki's Bulletin Boards=$+bblock *=*:@assert isint( trim( %0 ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBWIZ, %# ), match( %#, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, owner ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not own that board. ); }; @assert ulocal( %!/FUNCTION`IS_VALID_LOCK, trim( %1 ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, Invalid lock. ); }; think sql( ulocal( %!/QUERY`UPDATE`BOARD_BY_ID, %qB, `lock_read` = "[edit( %1, %b, )]" ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, Board [trim( %0 )] read locked to: [edit( %1, %b, )]. );
+-
+&COMMAND`+BBMOVE [System] Loki's Bulletin Boards=$+bbmove */*=*:think setq( B, trim( %0 ) ); think setq( M, trim( %1 ) ); think setq( T, trim( %2 ) ); @assert cand( isint( %qB ), isint( %qT ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by number. ); }; @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the message by number. ); }; think setq( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qB ) ); think setq( T, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qT ) ); think setq( M, ulocal( %!/FUNCTION`GET_MESSAGE_BY_BOARD_AND_NUMBER, %qB, %qM ) ); @assert cand( isint( %qB ), isint( %qT ), isint( %qM ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, The board or message supplied does not exist. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBMOD, %# ), match( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, poster ) ), %# ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You cannot move a message you didn't write. ); }; @assert ulocal( %!/FUNCTION`CAN_WRITE, %qT, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not have access to that bboard. ); }; think sql( ulocal( %!/QUERY`UPDATE`MESSAGE_BY_ID, %qM, `board_id` = %qT ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You move your message to board [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qT, name ) )]. );
+-
+&COMMAND`+BBNEW [System] Loki's Bulletin Boards=$+bbnew:think setq( L, filter( %!/FILTER`BOARD_READER, sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ), | ), |, \,, %#, ) ); think setq( M, first( sql( ulocal( %!/QUERY`SELECT`UNREAD_BY_READER_AND_BOARDS, %#, %qL ) ) ) ); @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There are no unread messages. ); }; think setq( B, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, board_id ) ) ); @pemit %# = ulocal( %!/CONFIG`HEADER, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) ); @pemit %# = [ljust( Message: [ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD, %qB )]/[ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD_AND_MESSAGE, %qB, %qM )], 46 )] [ljust( Posted, 10 )] [ljust( Author, 20 )]; @pemit %# = [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, subject ) ), 46 ), 46 )] [ljust( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, created_at ) ) ), 10 )] [ljust( left( ulocal( %!/FUNCTION`GET_AUTHOR, %qM ), 20 ), 20 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @pemit %# = edit( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, body ) ), %%", " ); @pemit %# = ulocal( %!/CONFIG`FOOTER ); think ulocal( %!/FUNCTION`MARK_READ, %#, %qM );
+-
+&COMMAND`+BBNEWGROUP [System] Loki's Bulletin Boards=$+bbnewgroup *:@assert ulocal( %!/FUNCTION`IS_BBWIZ, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not allowed to use that command. ); }; @assert ulocal( %!/FUNCTION`IS_SECURE_TITLE, %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, "%0" is not a valid board name. ); }; @break isint( sql( ulocal( %!/QUERY`SELECT`BOARD_BY_NAME, %0 ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, A board by that name already exists. ); }; think sql( ulocal( %!/QUERY`INSERT`BOARD, %0, %# ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You create a new bboard named '%0'. );
+-
+&COMMAND`+BBNEXT [System] Loki's Bulletin Boards=$+bbnext:think setq( L, filter( %!/FILTER`BOARD_READER, sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ), | ), |, \,, %#, ) ); think setq( M, first( sql( ulocal( %!/QUERY`SELECT`UNREAD_BY_READER_AND_BOARDS, %#, %qL ) ) ) ); @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There are no unread messages. ); }; think setq( B, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, board_id ) ) ); @pemit %# = ulocal( %!/CONFIG`HEADER, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) ); @pemit %# = [ljust( Message: [ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD, %qB )]/[ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD_AND_MESSAGE, %qB, %qM )], 46 )] [ljust( Posted, 10 )] [ljust( Author, 20 )]; @pemit %# = [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, subject ) ), 46 ), 46 )] [ljust( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, created_at ) ) ), 10 )] [ljust( left( ulocal( %!/FUNCTION`GET_AUTHOR, %qM ), 20 ), 20 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @pemit %# = edit( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, body ) ), %%", " ); @pemit %# = ulocal( %!/CONFIG`FOOTER ); think ulocal( %!/FUNCTION`MARK_READ, %#, %qM );
+-
+&COMMAND`+BBNOTIFY [System] Loki's Bulletin Boards=$+bbnotify *=*:@assert cand( isint( %0 ), isint( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid board number. ); }; @assert ulocal( %!/FILTER`BOARD_READER, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not subscribe to that board. ); }; @assert t( match( ON OFF, ucstr( trim( %1 ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, Please specify 'on' or 'off'. ); }; think sql( ulocal( QUERY`[switch( ucstr( trim( %1 ) ), ON, DELETE, OFF, INSERT )]`BOARD_NOTIFY, %qB, %# ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, Post notifications for Board #[trim( %0 )] \([sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )]\) turned [lcstr( trim( %1 ) )]. );
+-
+&COMMAND`+BBPOST [System] Loki's Bulletin Boards=$+bbpost:@assert hasattr( %!, DATA`POST_HEADER_%# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not writing a message. ); }; @assert gt( setr( L, strlen( xget( %!, DATA`POST_BODY_%# ) ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You have not written a body for your message\, yet. ); }; think setq( B, first( xget( %!, DATA`POST_HEADER_%# ), | ) ); think setq( T, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, default_timeout ) ) ); think setq( A, strlen( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, anonymous ) ) ) ); think setq( S, rest( xget( %!, DATA`POST_HEADER_%# ), | ) ); think sql( ulocal( %!/QUERY`INSERT`MESSAGE, %qB, %#, %qS, [xget( %!, DATA`POST_BODY_%# )][ifelse( cand( not( %qA ), hasattr( %#, BB_SIG ) ), %r[u( %#/BB_SIG )], )], [ifelse( %qT, add( secs(), %qT ), )] ) ); think setq( M, sql( ulocal( %!/QUERY`SELECT`LAST_INSERT_ID ) ) ); think sql( ulocal( %!/QUERY`UPDATE`BOARD_BY_ID, %qB, `last_message_id` = %qM ) ); think setq( N, words( sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_BOARD, %qB ) ) ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You post your note about '%qS' in group [trim( %0 )] \([setr( V, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) )]\) as message #%qN. ); @pemit/list [setdiff( filter( %!/FILTER`SHOULD_GET_NOTICE, lwho(), , , %qB, ), %# )] = ulocal( %!/CONFIG`MESSAGE, New message \([ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD, %qB )]/%qN\) posted to '%qV' by %N: %qS ); think ulocal( %!/FUNCTION`MARK_READ, %#, %qM ); &DATA`POST_HEADER_%# %!; &DATA`POST_BODY_%# %!;
+-
+&COMMAND`+BBPOST_START [System] Loki's Bulletin Boards=$+bbpost */*:@break strmatch( %1, *=* ); @assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @assert cand( ulocal( %!/FUNCTION`CAN_READ, %qB, %# ), ulocal( %!/FUNCTION`CAN_WRITE, %qB, %# ), ulocal( %!/FUNCTION`IS_BOARD_MEMBER, %#, %qB ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You cannot post to a group which you are not a member of. ); }; @assert lt( strlen( %1 ), 255 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, Your title is too long. ); }; @break hasattr( %!, DATA`POST_HEADER_%# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are already in the middle of writing a new message. ); }; &DATA`POST_HEADER_%# %! = %qB|[objeval( %#, %1 )]; @pemit %# = ulocal( %!/CONFIG`MESSAGE, You start your posting to board #[trim( %0 )] \([sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )]\). ); @pemit %# = You can now compose the body of the post by using '+bbwrite <text>' or '+bb <text>'. When you are finished, type '+bbpost' by itself.; @assert cand( hasattr( %#, BB_SIG ), strlen( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, anonymous ) ) ) ); @pemit %# = This is an anonymous group. Your BB_SIG will not be appended.;
+-
+&COMMAND`+BBPOST_QUICK [System] Loki's Bulletin Boards=$+bbpost */*=*:@assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @assert cand( ulocal( %!/FUNCTION`CAN_READ, %qB, %# ), ulocal( %!/FUNCTION`CAN_WRITE, %qB, %# ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not authorized to post to that board. ); }; @assert ulocal( %!/FUNCTION`IS_BOARD_MEMBER, %#, %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You cannot post to a group which you are not a member of. ); }; @assert lt( strlen( %1 ), 255 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, Your title is too long. ); }; @assert lt( strlen( %2 ), [v( CONFIG`LBUF )] ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, Your body is too long. ); }; think setq( T, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, default_timeout ) ) ); think setq( A, strlen( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, anonymous ) ) ) ); think sql( ulocal( %!/QUERY`INSERT`MESSAGE, %qB, %#, setr( S, trim( objeval( %#, %1 ) ) ), objeval( %#, %2 )[ifelse( cand( not( %qA ), hasattr( %#, BB_SIG ) ), %r[u( %#/BB_SIG )], )], [ifelse( %qT, add( secs(), %qT ), )] ) ); think setq( M, sql( ulocal( %!/QUERY`SELECT`LAST_INSERT_ID ) ) ); think sql( ulocal( %!/QUERY`UPDATE`BOARD_BY_ID, %qB, `last_message_id` = %qM ) ); think setq( N, words( sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_BOARD, %qB ) ) ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You post your note about '[trim( objeval( %#, %1 ) )]' in group [trim( %0 )] \([setr( V, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) )]\) as message #%qN. ); @pemit/list [setdiff( filter( %!/FILTER`SHOULD_GET_NOTICE, lwho(), , , %qB, ), %# )] = ulocal( %!/CONFIG`MESSAGE, New message \([trim( %0 )]/%qN\) posted to '%qV' by %N: %qS ); think ulocal( %!/FUNCTION`MARK_READ, %#, %qM );
+-
+&COMMAND`+BBPROOF [System] Loki's Bulletin Boards=$+bbproof:@assert hasattr( %!, DATA`POST_HEADER_%# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not writing a message. ); }; think setq( B, first( xget( %!, DATA`POST_HEADER_%# ), | ) ); @pemit %# = ulocal( %!/CONFIG`HEADER, BB Post in Progress ); @pemit %# = Group: [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )]; @pemit %# = Title: [rest( xget( %!, DATA`POST_HEADER_%# ), | )]; @pemit %# = [u( %!/CONFIG`SEPARATOR )]; @pemit %# = [xget( %!, DATA`POST_BODY_%# )]; @pemit %# = [ulocal( %!/CONFIG`FOOTER )];
+-
+&COMMAND`+BBREAD [System] Loki's Bulletin Boards=$+bbread:think setq( E, switch( first( version() ), RhostMUSH, [center( '*' = restricted, 20 )][center( '-' = read only, 20 )][center( '%(-%)' = read only\, but you can write, 38 )] ), [center( '*' = restricted, 26 )][center( '-' = read only, 26 )][center( '%(-%)' = read only\, but you can write, 26 )] ); think setq( L, sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ), | ) ); @pemit %# = ulocal( %!/CONFIG`HEADER, Global Bulletin Board ); @pemit %# = [space( 9 )][ljust( Board Name, 38 )] [center( Last Post, 12 )] [center( # of Messages, 17 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @dolist/delim | %qL|#-1 = { @break match( ##, #-1 ) = { @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @pemit %# = %qE; @pemit %# = ulocal( %!/CONFIG`FOOTER ); }; @assert cand( ulocal( %!/FUNCTION`CAN_READ, ##, %# ), ulocal( %!/FUNCTION`IS_BOARD_MEMBER, %#, ## ) ); @pemit %# = [rjust( #@, 4 )] [ulocal( FUNCTION`BOARD_FLAGS, %#, ## )] [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, ##, name ) ), 38 ), 38 )] [center( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, ##, last_message_id ) ), created_at ) ) ), 12 )] [rjust( words( sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_BOARD, ## ) ) ), 10 )] [ulocal( %!/FUNCTION`BOARD_MESSAGE_FLAGS, %#, ## )]; };
+-
+&COMMAND`+BBREAD_BOARD [System] Loki's Bulletin Boards=$+bbread *:@break strmatch( %0, */* ); think setq( B, trim( %0 ) ); @assert isint( %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by number. ); }; think setq( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qB ) ); @assert ulocal( %!/FUNCTION`CAN_READ, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not have access to that bboard. ); }; @pemit %# = ulocal( %!/CONFIG`HEADER, Global Bulletin Board ); @pemit %# = [center( **** [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )] ****, 78 )]; @pemit %# = [space( 11 )] [ljust( Subject, 45 )] [ljust( Posted, 10 )] [ljust( Author, 18 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); think setq( L, sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_BOARD, %qB ), | ) ); @dolist/delim | %qL|#-1 = { @break match( #-1, ## ) = { @pemit %# = ulocal( %!/CONFIG`FOOTER ); }; @pemit %# = [rjust( trim( %0 ), 4 )]/[ljust( #@, 4 )] [ulocal( %!/FUNCTION`MESSAGE_FLAGS, ##, %# )] [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, subject ) ), 45 ), 45 )] [ljust( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, created_at ) ) ), 10 )] [ljust( left( ulocal( %!/FUNCTION`GET_AUTHOR, ## ), 18 ), 18 )]; };
+-
+&COMMAND`+BBREAD_MESSAGE [System] Loki's Bulletin Boards=$+bbread */*: think setq( B, trim( %0 ) ); think setq( L, ulocal( %!/FUNCTION`MAKE_LIST_FROM_RANGES, %1 ) ); @break match( %qL, u ); @assert isint( %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by number. ); }; @assert t(%qL) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the message by number or number ranges.); }; think setq( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qB ) ); @assert ulocal( %!/FUNCTION`CAN_READ, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not have access to that bboard. ); }; think setq( R, ulocal( %!/FUNCTION`GET_MSG_IDS_FROM_BOARD_BY_RANGES, %qB, %qL ) ); @assert t( %qR ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid message number or range. ); }; @dolist %qR = { @pemit %# = ulocal( %!/CONFIG`HEADER, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) ); @pemit %# = [ljust( Message: [edit( %0, %b, )]/[edit( ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD_AND_MESSAGE, %qB, ## ), %b, )], 46 )] [ljust( Posted, 10 )] [ljust( Author, 20 )]; @pemit %# = [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, subject ) ), 46 ), 46 )] [ljust( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, created_at ) ) ), 10 )] [ljust( left( ulocal( %!/FUNCTION`GET_AUTHOR, ## ), 20 ), 20 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @pemit %# = edit( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, body ) ), %%", " ); @pemit %# = ulocal( %!/CONFIG`FOOTER ); think ulocal( %!/FUNCTION`MARK_READ, %#, ## ); }
+-
+&COMMAND`+BBREAD_UNREAD [System] Loki's Bulletin Boards=$+bbread */u:@assert cand( isint( %0 ), isint( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid board number. ); }; @assert ulocal( %!/FILTER`BOARD_READER, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not subscribe to that board. ); }; think setq( L, sql( ulocal( %!/QUERY`SELECT`UNREAD_BY_READER_AND_BOARDS, %#, %qB ) ) ); @assert words( %qL ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There are no unread messages on that board. ); }; @dolist %qL = { @pemit %# = ulocal( %!/CONFIG`HEADER, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) ) ); @pemit %# = [ljust( Message: [edit( %0, %b, )]/[edit( ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD_AND_MESSAGE, %qB, ## ), %b, )], 46 )] [ljust( Posted, 10 )] [ljust( Author, 20 )]; @pemit %# = [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, subject ) ), 46 ), 46 )] [ljust( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, created_at ) ) ), 10 )] [ljust( left( ulocal( %!/FUNCTION`GET_AUTHOR, ## ), 20 ), 20 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @pemit %# = edit( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, body ) ), %%", " ); @pemit %# = ulocal( %!/CONFIG`FOOTER ); think ulocal( %!/FUNCTION`MARK_READ, %#, ## ); };
+-
+&COMMAND`+BBREMOVE [System] Loki's Bulletin Boards=$+bbremove */*:think setq( B, trim( %0 ) ); think setq( M, trim( %1 ) ); @break match( %qM, u ); @assert isint( %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by number. ); }; @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the message by number. ); }; think setq( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qB ) ); @assert ulocal( %!/FUNCTION`CAN_READ, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not have access to that bboard. ); }; think setq( M, ulocal( %!/FUNCTION`GET_MESSAGE_BY_BOARD_AND_NUMBER, %qB, %qM ) ); @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid message number. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBMOD, %# ), match( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, poster ) ), %# ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You cannot remove a message you didn't write. ); }; think sql( ulocal( %!/QUERY`DELETE`ALL_READS_BY_MESSAGE, %qM ) ); think sql( ulocal( %!/QUERY`DELETE`MESSAGE_BY_ID, %qM ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You remove your message. );
+-
+&COMMAND`+BBSEARCH [System] Loki's Bulletin Boards=$+bbsearch */*:@assert cand( isint( %0 ), isint( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid board number. ); }; @assert ulocal( %!/FILTER`BOARD_READER, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not subscribe to that board. ); }; @assert isdbref( setr( T, pmatch( trim( %1 ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid player. ); }; @assert words( setr( L, sql( ulocal( %!/QUERY`SELECT`MESSAGES_BY_BOARD_AND_POSTER, %qB, %qT ), | ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That player has not posted to the specified bboard. ); }; @pemit %# = ulocal( %!/CONFIG`HEADER, Global Bulletin Board ); @pemit %# = [center( **** [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, name ) )] ****, 78 )]; @pemit %# = [space( 11 )] [ljust( Subject, 45 )] [ljust( Posted, 10 )] [ljust( Author, 18 )]; @pemit %# = ulocal( %!/CONFIG`SEPARATOR ); @dolist/delim | %qL|#-1 = { @break match( #-1, ## ) = { @pemit %# = ulocal( %!/CONFIG`FOOTER ); }; @pemit %# = [rjust( trim( %0 ), 4 )]/[ljust( ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD_AND_MESSAGE, %qB, ## ), 4 )] [ulocal( %!/FUNCTION`MESSAGE_FLAGS, ##, %# )] [ljust( left( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, subject ) ), 45 ), 45 )] [ljust( ulocal( %!/FUNCTION`SHORTDATE, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, ##, created_at ) ) ), 10 )] [ljust( left( ulocal( %!/FUNCTION`GET_AUTHOR, ## ), 18 ), 18 )]; };
+-
+&COMMAND`+BBSCAN [System] Loki's Bulletin Boards=$+bbscan:@pemit %# = ulocal( %!/CONFIG`HEADER, Unread Postings on the Global Bulletin Board ); @dolist/delim | [filter( %!/FILTER`BOARD_READER, sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ), | ), |, |, %#, )]|#-1 = { @break match( #-1, ## ) = { @pemit %# = ulocal( %!/CONFIG`FOOTER, Total BB Messages: [sql( ulocal( %!/QUERY`SELECT`COUNT_ALL_MESSAGES ) )] ); }; @assert [strlen( setr( U, sql( ulocal( QUERY`SELECT`UNREAD_BY_READER_AND_BOARDS, %#, ## ) ) ) )]; @pemit %# = [sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, ##, name ) )] \([ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD, ## )]\): [words( %qU )] unread \([iter( %qU, ulocal( %!/FUNCTION`GET_NUMBER_BY_BOARD_AND_MESSAGE, ##, itext( 0 ) ) )]\); };
+-
+&COMMAND`+BBTIMEOUT [System] Loki's Bulletin Boards=$+bbtimeout */*=*:think setq( B, trim( %0 ) ); think setq( M, trim( %1 ) ); @break match( %qM, u ); @assert isint( %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by number. ); }; @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the message by number. ); }; think setq( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qB ) ); @assert ulocal( %!/FUNCTION`CAN_READ, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not have access to that bboard. ); }; think setq( M, ulocal( %!/FUNCTION`GET_MESSAGE_BY_BOARD_AND_NUMBER, %qB, %qM ) ); @assert isint( %qM ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid message number. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBMOD, %# ), match( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, poster ) ), %# ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You cannot modify a message you didn't write. ); }; @assert cand( isint( trim( %2 ) ), gte( %2, 0 ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, That is not a valid number of days. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBMOD, %# ), cand( gt( %2, 0 ), cor( eq( 0, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, default_timeout ) ) ), lte( add( secs(), mul( %2, 60, 60, 24 ) ), add( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %qM, created_at ) ), sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, default_timeout ) ) ) ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You cannot specify a timeout greater than the default. ); }; think setq( T, add( secs(), mul( %2, 60, 60, 24 ) ) ); think sql( ulocal( %!/QUERY`UPDATE`MESSAGE_BY_ID, %qM, `timeout` = [ifelse( eq( trim( %2 ), 0 ), NULL, %qT )]\, `updated_at` = [secs()] ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, ifelse( eq( trim( %2 ), 0 ), Timeout for the specified message has been cleared. This message will no longer time out., The specified message will timeout on [timefmt( $C $B $Y, %qT )] ) );
+-
+&COMMAND`+BBTOSS [System] Loki's Bulletin Boards=$+bbtoss:@assert hasattr( %!, DATA`POST_HEADER_%# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not writing a message. ); }; @pemit %# = ulocal( %!/CONFIG`MESSAGE, You abandon your note in progress. ); &DATA`POST_HEADER_%# %!; &DATA`POST_BODY_%# %!;
+-
+&COMMAND`+BBWRITE [System] Loki's Bulletin Boards=$+bbwrite *:@assert hasattr( %!, DATA`POST_HEADER_%# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not writing a message. ); }; @assert lte( setr( L, add( strlen( xget( %!, DATA`POST_BODY_%# ) ), strlen( objeval( %#, %0 ) ) ) ), v( CONFIG`LBUF ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, The total text length would be %qL \(max 3500\). Consider breaking your text into multiple posts. ); }; &DATA`POST_BODY_%# %! = [xget( %!, DATA`POST_BODY_%# )] [objeval( %#, %0 )]; @pemit %# = ulocal( %!/CONFIG`MESSAGE, Text added to your bbpost. \(%qL/[v( CONFIG`LBUF )]\) );
+-
+&COMMAND`+BBWRITELOCK [System] Loki's Bulletin Boards=$+bbwritelock *=*:@assert isint( %0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify a valid board number. ); }; @assert gt( setr( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %0 ) ), 0 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, There is no such board. ); }; @assert cor( ulocal( %!/FUNCTION`IS_BBWIZ, %# ), match( %#, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %qB, owner ) ) ) ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not own that board. ); }; @assert ulocal( %!/FUNCTION`IS_VALID_LOCK, %1 ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, Invalid lock. ); }; think sql( ulocal( %!/QUERY`UPDATE`BOARD_BY_ID, %qB, `lock_write` = "[edit( %1, %b, )]" ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, Board %0 write locked to: [edit( %1, %b, )]. );
+-
+&COMMAND`+BBRENAME [System] Loki's Bulletin Boards=$+bbrename *=*:@assert ulocal( %!/FUNCTION`IS_BBWIZ, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You are not allowed to use that command. ); }; think setq( B, trim( %0 ) ); @assert isint( %qB ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You must specify the board by number. ); }; think setq( B, ulocal( %!/FUNCTION`GET_BOARD_BY_NUMBER, %qB ) ); @assert ulocal( %!/FUNCTION`CAN_READ, %qB, %# ) = { @pemit %# = ulocal( %!/CONFIG`MESSAGE, You do not have access to that bboard. ); }; think sql( ulocal( %!/QUERY`UPDATE`BOARD_BY_ID, %qB, `name` = "[trim( %1 )]" ) ); @pemit %# = ulocal( %!/CONFIG`MESSAGE, You rename Board #[trim( %0 )] to '[trim( %1 )]'. );
+-
+
+@@ //////////////////////////
+@@ Filters
+@@ //////////////////////////
+&FILTER`BOARD_READER [System] Loki's Bulletin Boards=cand( ulocal( %!/FUNCTION`CAN_READ, %0, %1 ), ulocal( %!/FUNCTION`IS_BOARD_MEMBER, %1, %0 ) )
+-
+&FILTER`IS_INT [System] Loki's Bulletin Boards=isint( %0 )
+-
+&FILTER`BOARD_NOTIFIER [System] Loki's Bulletin Boards=not( sql( ulocal( %!/QUERY`SELECT`NOTIFIER_BY_READER_AND_BOARD, %0, %1 ) ) )[@@( This function works in reverse of what one would expect. If there IS a record in the SQL table, then they are NOT receiving notifications. )]
+-
+&FILTER`SHOULD_GET_NOTICE [System] Loki's Bulletin Boards=cand( ulocal( %!/FILTER`BOARD_READER, %1, %0 ), ulocal( %!/FILTER`BOARD_NOTIFIER, %0, %1 ) )
+-
+&FILTER`ISINT [System] Loki's Bulletin Boards=isint(%0)
+-
+
+@@ //////////////////////////
+@@ Functions
+@@ //////////////////////////
+&FUNCTION`BOARD_FLAGS [System] Loki's Bulletin Boards=[setq( R, t( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %1, lock_read ) ) ) )][setq( W, t( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %1, lock_write ) ) ) )][switch( 1, cand( r( W ), ulocal( %!/FUNCTION`CAN_READ, %1, %0 ), ulocal( %!/FUNCTION`CAN_WRITE, %1, %0 ) ), \(-\), cand( r( W ), ulocal( %!/FUNCTION`CAN_READ, %1, %0 ) ), %b-%b, cand( r( R ), not( r( W ) ), ulocal( %!/FUNCTION`CAN_READ, %1, %0 ) ), %b*%b, space( 3 ) )]
+-
+&FUNCTION`CAN_READ [System] Loki's Bulletin Boards=ulocal( FUNCTION`PARSE_LOCK, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %0, lock_read ) ), %1 )
+-
+&FUNCTION`CAN_WRITE [System] Loki's Bulletin Boards=ulocal( FUNCTION`PARSE_LOCK, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, %0, lock_write ) ), %1 )
+-
+&FUNCTION`CONFIG`ANONYMOUS [System] Loki's Bulletin Boards=switch( 0, lt( strlen( %1 ), 32 ), Your poster name is too long., ulocal( %!/FUNCTION`IS_SECURE_TITLE, %1 ), that is not a valid poster name., strlen( %1 ), sql( ulocal( %!/QUERY`UPDATE`BOARD_BY_ID, %0, `anonymous` = NULL ) )You clear the anonymous attribute., sql( ulocal( %!/ QUERY`UPDATE`BOARD_BY_ID, %0, `anonymous` = "%1" ) )You set the anonymous attribute to %1. )
+-
+&FUNCTION`CONFIG`TIMEOUT [System] Loki's Bulletin Boards=switch( 0, isint( %1 ), You must specify the timeout in a number of days., sql( ulocal( %!/QUERY`UPDATE`BOARD_BY_ID, %0, `default_timeout` = "[mul( %1, 60, 60, 24 )]" ) )You set the timeout to %1 days. )
+-
+&FUNCTION`GET_AUTHOR [System] Loki's Bulletin Boards=ifelse( strlen( setr( A, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_BOARD_ID, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %0, board_id ) ), anonymous ) ) ) ), %qA, name( sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %0, poster ) ) ) )
+-
+&FUNCTION`GET_BOARD_BY_NUMBER [System] Loki's Bulletin Boards=elements( sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ), | ), %0, | )
+-
+&FUNCTION`GET_MESSAGE_BY_BOARD_AND_NUMBER [System] Loki's Bulletin Boards=elements( sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_BOARD, %0 ), | ), %1, | )
+-
+&FUNCTION`GET_NUMBER_BY_BOARD [System] Loki's Bulletin Boards=match( sql( ulocal( %!/QUERY`SELECT`ALL_BOARDS ), | ), %0, | )
+-
+&FUNCTION`GET_NUMBER_BY_BOARD_AND_MESSAGE [System] Loki's Bulletin Boards=match( sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_BOARD, %0 ), | ), %1, | )
+-
+&FUNCTION`HAS_READ_MESSAGE [System] Loki's Bulletin Boards=t( sql( ulocal( %!/QUERY`SELECT`MESSAGE_READ_BY_POSTER_AND_ID, %0, %1 ) ) )
+-
+&FUNCTION`IS_BBWIZ [System] Loki's Bulletin Boards=switch( first( version() ), RhostMUSH, gte( bittype( %0 ), 5 ) , hasflag( %0, WIZARD ) )
+-
+&FUNCTION`IS_BOARD_MEMBER [System] Loki's Bulletin Boards=not( sql( ulocal( %!/QUERY`SELECT`MEMBER_BY_ID_AND_BOARD, %0, %1 ) ) )[@@( This function works in reverse of what one would expect. If there IS a record in the SQL table, then they are NOT a member. )]
+-
+&FUNCTION`IS_SECURE_TITLE [System] Loki's Bulletin Boards=not( foreach( %!/FUNCTION`SECURE_TITLE, %0 ) )
+-
+&FUNCTION`IS_VALID_LOCK [System] Loki's Bulletin Boards=switch( ucstr( before( %0, / ) ), 1, 1, 0, 0, FLAG, eq( words( after( %0, / ) ), 1 ), POWER, eq( words( after( %0, / ) ), 1 ), ifelse( cand( isdbref( before( %0, / ) ), hasattr( before( %0, / ), after( %0, / ) ) ), 1, 0 ) )
+-
+&FUNCTION`MARK_READ [System] Loki's Bulletin Boards=sql( ulocal( %!/QUERY`INSERT`MESSAGE_READ, %0, %1 ) )
+-
+&FUNCTION`MESSAGE_FLAGS [System] Loki's Bulletin Boards=switch( 1, not( ulocal( %!/FUNCTION`HAS_READ_MESSAGE, %1, %0 ) ), U, cand( lt( sub( setr( T, sql( ulocal( %!/QUERY`SELECT`FIELD_BY_MESSAGE_ID, %0, timeout ) ) ), mul( 60, 60, 24 ) ), secs() ), isint( %qT ) ), T, %b )
+-
+&FUNCTION`PARSE_LOCK [System] Loki's Bulletin Boards=switch( 1, eq( strlen( %0 ), 0 ), 1, match( before( %0, / ), FLAG ), hasflag( %1, after( %0, / ) ), match( before( %0, / ), POWER ), haspower( %1, after( %0, / ) ), cand( isdbref( before( %0, / ) ), hasattr( before( %0, / ), after( %0, / ) ) ), ulocal( %0, %1 ), 0 )
+-
+&FUNCTION`MATCH_CLEAR_GROUP [System] Loki's Bulletin Boards=trim( squish( iter( lattr( %0/_BBCLEAR.* ), ifelse( match( xget( %0, itext( 0 ) ), %1 ), itext( 0 ), ) ) ) )
+-
+&FUNCTION`SECURE_TITLE [System] Loki's Bulletin Boards=if( match( ~ ` ! @ # $ %% ^ & * ( ) + = { } | [ ] \\ ; : " . / < > ?, %0 ), 1 )
+-
+&FUNCTION`SHORTDATE [System] Loki's Bulletin Boards=switch( 1, match( #-1, %0 ), Never, eq( strlen( %0 ), 0 ), Never, gte( sub( secs(), mul( 365, 60, 60, 24 ) ), %0 ), timefmt( $b $Y, %0 ), timefmt( $a $b $D, %0 ) )
+-
+&FUNCTION`IS_BBMOD [System] Loki's Bulletin Boards=ifelse( v( CONFIG`BBMOD ), switch( first( version() ), RhostMUSH, gte( bittype( %0 ), 4 ) , hasflag( %0, ROYALTY ) ), ulocal( %!/FUNCTION`IS_BBWIZ, %0 ) )
+-
+&FUNCTION`BOARD_MESSAGE_FLAGS [System] Loki's Bulletin Boards=switch( 1, t( words( sql( ulocal( %!/QUERY`SELECT`UNREAD_BY_READER_AND_BOARDS, %0, %1 ) ) ) ), U, %b )
+-
+&FUNCTION`MAKE_LIST_FROM_RANGES [System] Loki's Bulletin Boards=filter(%!/FILTER`ISINT, iter(%0,ifelse(strmatch(##,*-*),lnum(before(##,-),after(##,-)),##)))
+-
+&FUNCTION`GET_MSG_IDS_FROM_BOARD_BY_RANGES [System] Loki's Bulletin Boards=elements( sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_BOARD, %0 ), | ), %1, |, %b )
+-
+
+@@ //////////////////////////
+@@ Queries
+@@ //////////////////////////
+&QUERY`DELETE`ALL_MESSAGES_BY_BOARD [System] Loki's Bulletin Boards=DELETE FROM `[v( CONFIG`PREFIX )]message` WHERE `board_id` = %0;
+-
+&QUERY`DELETE`ALL_READS_BY_BOARD [System] Loki's Bulletin Boards=DELETE FROM `[v( CONFIG`PREFIX )]message_read` WHERE `message_id` IN ( SELECT `id` FROM `[v( CONFIG`PREFIX )]message` WHERE `board_id` = %0 );
+-
+&QUERY`DELETE`ALL_READS_BY_MESSAGE [System] Loki's Bulletin Boards=DELETE FROM `[v( CONFIG`PREFIX )]message_read` WHERE `message_id` = %0;
+-
+&QUERY`DELETE`BOARD_BY_ID [System] Loki's Bulletin Boards=DELETE FROM `[v( CONFIG`PREFIX )]board` WHERE `id` = %0;
+-
+&QUERY`DELETE`MESSAGE_BY_ID [System] Loki's Bulletin Boards=DELETE FROM `[v( CONFIG`PREFIX )]message` WHERE `id` = %0;
+-
+&QUERY`DELETE`BOARD_MEMBER_BY_ID_AND_BOARD [System] Loki's Bulletin Boards=DELETE FROM `[v( CONFIG`PREFIX )]board_member` WHERE `member` = '%0' AND `board_id` = %1;
+-
+&QUERY`INSERT`BOARD [System] Loki's Bulletin Boards=INSERT INTO `[v( CONFIG`PREFIX )]board` ( `name`, `owner`, `created_at`, `updated_at` ) VALUES ( "%0", "%1", [secs()], [secs()] );
+-
+&QUERY`INSERT`MESSAGE [System] Loki's Bulletin Boards=INSERT INTO `[v( CONFIG`PREFIX )]message` ( `board_id`, `poster`, `subject`, `body`, `timeout`, `created_at`, `updated_at` ) VALUES ( %0, "%1", "[edit( objeval( %1, %2 ), ", %\" )]", "[edit( objeval( %1, %3 ), ", %\" )]", [ifelse( %4, %4, NULL )], [secs()], [secs()] );
+-
+&QUERY`INSERT`MESSAGE_READ [System] Loki's Bulletin Boards=REPLACE INTO `[v( CONFIG`PREFIX )]message_read` SET `reader` = "%0", `message_id` = %1;
+-
+&QUERY`INSERT`BOARD_MEMBER [System] Loki's Bulletin Boards=REPLACE INTO `[v( CONFIG`PREFIX )]board_member` SET `member` = '%0', `board_id` = %1;
+-
+&QUERY`SELECT`ALL_BOARDS [System] Loki's Bulletin Boards=SELECT `id` FROM `[v( CONFIG`PREFIX )]board` ORDER BY `order_group` ASC, `name` ASC;
+-
+&QUERY`SELECT`ALL_MESSAGES_BY_BOARD [System] Loki's Bulletin Boards=SELECT `id` FROM `[v( CONFIG`PREFIX )]message` WHERE `board_id` = %0 ORDER BY `id` ASC;
+-
+&QUERY`SELECT`BOARD_BY_NAME [System] Loki's Bulletin Boards=SELECT `id` FROM `[v( CONFIG`PREFIX )]board` WHERE `name` = '[escape( %0 )]';
+-
+&QUERY`SELECT`FIELD_BY_BOARD_ID [System] Loki's Bulletin Boards=SELECT `%1` FROM `[v( CONFIG`PREFIX )]board` WHERE `id` = %0;
+-
+&QUERY`SELECT`FIELD_BY_MESSAGE_ID [System] Loki's Bulletin Boards=SELECT `%1` FROM `[v( CONFIG`PREFIX )]message` WHERE `id` = %0;
+-
+&QUERY`SELECT`LAST_INSERT_ID [System] Loki's Bulletin Boards=SELECT last_insert_id();
+-
+&QUERY`SELECT`MEMBER_BY_ID_AND_BOARD [System] Loki's Bulletin Boards=SELECT 1 FROM `[v( CONFIG`PREFIX )]board_member` WHERE `member` = '%0' AND `board_id` = %1;
+-
+&QUERY`SELECT`MESSAGE_READ_BY_POSTER_AND_ID [System] Loki's Bulletin Boards=SELECT 1 FROM `[v( CONFIG`PREFIX )]message_read` WHERE `reader` = '%0' AND `message_id` = %1;
+-
+&QUERY`SELECT`UNREAD_BY_READER_AND_BOARDS [System] Loki's Bulletin Boards=SELECT `id` FROM `[v( CONFIG`PREFIX )]message` WHERE `id` NOT IN ( SELECT DISTINCT `message_id` FROM `[v( CONFIG`PREFIX )]message_read` WHERE `reader` = '%0' ) AND `board_id` IN ( %1 ) ORDER BY `id` ASC
+-
+&QUERY`UPDATE`BOARD_BY_ID [System] Loki's Bulletin Boards=UPDATE `[v( CONFIG`PREFIX )]board` SET %1 WHERE `id` = %0;
+-
+&QUERY`UPDATE`MESSAGE_BY_ID [System] Loki's Bulletin Boards=UPDATE `[v( CONFIG`PREFIX )]message` SET %1 WHERE `id` = %0;
+-
+&QUERY`SELECT`COUNT_ALL_MESSAGES [System] Loki's Bulletin Boards=SELECT count( `id` ) FROM `[v( CONFIG`PREFIX )]message`;
+-
+&QUERY`DELETE`BOARD_NOTIFY [System] Loki's Bulletin Boards=DELETE FROM `[v( CONFIG`PREFIX )]board_notify` WHERE `board_id` = %0 AND `member` = "%1";
+-
+&QUERY`INSERT`BOARD_NOTIFY [System] Loki's Bulletin Boards=INSERT INTO `[v( CONFIG`PREFIX )]board_notify` ( `member`, `board_id` ) VALUES ( "%1", %0 );
+-
+&QUERY`SELECT`NOTIFIER_BY_BOARD_AND_READER [System] Loki's Bulletin Boards=SELECT 1 FROM `[v( CONFIG`PREFIX )]board_notifiy` WHERE `notifier` = '%0' AND `board_id` = %1;
+-
+&QUERY`SELECT`MESSAGES_BY_BOARD_AND_POSTER [System] Loki's Bulletin Boards=SELECT `id` FROM `[v( CONFIG`PREFIX )]message` WHERE `board_id` = %0 AND `poster` = '%1';
+-
+&QUERY`SELECT`ALL_MESSAGES_BY_TIMEOUT [System] Loki's Bulletin Boards=SELECT `id` FROM `[v( CONFIG`PREFIX )]message` WHERE `timeout` IS NOT NULL AND `timeout` < %0 ORDER BY `id` ASC;
+-
+&QUERY`SELECT`NOTIFIER_BY_READER_AND_BOARD [System] Loki's Bulletin Boards=SELECT 1 FROM `[v( CONFIG`PREFIX )]board_notify` WHERE `member` = '%0' AND `board_id` = %1;
+-
+
+@@ //////////////////////////
+@@ Triggers
+@@ //////////////////////////
+&TRIGGER`TIMEOUT [System] Loki's Bulletin Boards=@dolist [sql( ulocal( %!/QUERY`SELECT`ALL_MESSAGES_BY_TIMEOUT, secs() ) )] = { think sql( ulocal( %!/QUERY`DELETE`ALL_READS_BY_MESSAGE, ## ) ); think sql( ulocal( %!/QUERY`DELETE`MESSAGE_BY_ID, ## ) ); };
+-
